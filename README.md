@@ -1,0 +1,2 @@
+# ColorSegmentation
+Master's thesis
