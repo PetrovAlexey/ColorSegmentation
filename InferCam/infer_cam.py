@@ -113,8 +113,8 @@ def infer_split_cam(args):
 
     # cam_mask_dict = {}
     for iter, (img_name, output_list, label) in enumerate(infer_data_loader):
-        #if (iter <= 1379):
-        #    continue
+        if iter <= 170:
+            continue
         img_name = img_name[0]; label = label[0]
         cam_dict = {}
         for split_index, img_list in enumerate(output_list):
@@ -243,11 +243,12 @@ def infer_split_cam(args):
                         
                         ### Get Mask
                         #th, dst = cv2.threshold(mask*255.0, 100, 255, cv2.THRESH_BINARY)
-                        th, dst = cv2.threshold(mask, 0.7, 1.0, cv2.THRESH_BINARY)
+                        th, dst = cv2.threshold(mask, 0.8, 1.0, cv2.THRESH_BINARY)
                         dst = dst.astype(np.uint8)
                         res = cv2.bitwise_and(img, img, mask=dst)
 
-                        #line, centroid = get_pca_line(res)
+                        
+                        line, centroid = get_pca_line(res)
                         #cv2.imwrite(os.path.join(args.colour_seg + "Cam", img_name + '_{}.jpg'.format(classes[target_class])), res)
 
                         ### Apply grabCut
@@ -257,17 +258,38 @@ def infer_split_cam(args):
                         fgdModel = np.zeros((1,65),np.float64)
                         # wherever it is marked white (sure foreground), change mask=1
                         # wherever it is marked black (sure background), change mask=0
+
                         mask_cut = np.zeros(temp_img.shape[:2],np.uint8)
-                        mask_cut[newmask == 0] = 2
+
+
+                        ####
+                        colours = get_distance_line_gpu(X, line, centroid)
+                        test = (colours.cpu()).numpy().reshape(img.shape[0:2])
+                        threshold = np.mean(test)
+                        thr, dst_test = cv2.threshold(np.uint8(test),0, np.max(np.uint8(test)), cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
+                        dst_test = dst_test.astype(np.uint8)
+                        #mask_cut[dst_test != 0] = cv2.GC_PR_FGD
+                        ####
+                        
+                        mask_cut[newmask == 0] = cv2.GC_PR_BGD
+
+                        th, pr_bgd_dst = cv2.threshold(mask, 0.3, 1.0, cv2.THRESH_BINARY)
+                        pr_bgd_dst = pr_bgd_dst.astype(np.uint8)
+                        mask_cut[pr_bgd_dst == 0] = 0
+                        mask_cut[pr_bgd_dst != 0] = cv2.GC_PR_FGD
+
                         # Add anti-mask
                         if anti_mask is not None:
-                            th, anti_mask = cv2.threshold(anti_mask *255.0, 200, 255, cv2.THRESH_BINARY)
+                            th, anti_mask = cv2.threshold(anti_mask, 0.7, 1, cv2.THRESH_BINARY)
                             anti_mask  = anti_mask .astype(np.uint8)
                             res = cv2.bitwise_and(img, img, mask=anti_mask)
                             mask_cut[anti_mask != 0] = 0
-                            mask_cut[anti_mask == 0] = 2
+                            #mask_cut[anti_mask == 0] = 2
                             #cv2.imwrite(os.path.join(args.colour_seg + "Test", img_name + 'AntiMask_{}.jpg'.format(classes[target_class])), res)
                         mask_cut[newmask != 0] = 1
+                        #mask_cut[newmask != 0] = cv2.GC_PR_FGD
+                        
+
                         mask_cut, bgdModel, fgdModel = cv2.grabCut(temp_img,mask_cut,None,bgdModel,fgdModel,5,cv2.GC_INIT_WITH_MASK)
                         mask_cut = np.where((mask_cut==2)|(mask_cut==0),0,1).astype('uint8')
                         test_img = temp_img*mask_cut[:,:,np.newaxis]
@@ -290,19 +312,17 @@ def infer_split_cam(args):
                         #v = pptker.viewer(A)
 
                         #colours = get_distance_line_gpu(X, line, centroid)
-
                         #test = (colours.cpu()).numpy().reshape(img.shape[0:2])
-                        #threshold = np.mean(test)
-                        #th, dst = cv2.threshold(np.uint8(test), 0, 40, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
-
-                        #dst = dst.astype(np.uint8)
-                        #res = cv2.bitwise_and(img, img, mask=dst)
+                        threshold = np.mean(test)
+                        th, dst = cv2.threshold(np.uint8(test), threshold, np.max(np.uint8(test)), cv2.THRESH_BINARY_INV)
+                        dst = dst.astype(np.uint8)
+                        res = cv2.bitwise_and(raw_img, raw_img, mask=dst)
 
                         #heatmap = cv2.applyColorMap(np.uint8(255 * mask), cv2.COLORMAP_JET)
                         #img = cv2.resize(img, (heatmap.shape[1], heatmap.shape[0] ))
                         #cam_output = heatmap * 0.3 + img * 0.5
 
-                        #cv2.imwrite(os.path.join(args.colour_seg, img_name + '_{}.jpg'.format(classes[target_class])), res)
+                        cv2.imwrite(os.path.join(args.colour_seg, img_name + '_{}.jpg'.format(classes[target_class])), res)
                 
                 blank_image = cv2.cvtColor(blank_image, cv2.COLOR_RGB2BGR)
                 cam_image = cv2.cvtColor(cam_image, cv2.COLOR_RGB2BGR)
