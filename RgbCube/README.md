@@ -2,7 +2,8 @@
 
 Приложение позволяет преобразовать любое изображение в пространство RGB куба.
 
-![Иллюстрация к проекту](https://github.com/CV-NLP-Lab/sandbox/blob/Petrov/RgbCube/RgbCube/screenshots/screenshot.png?raw=true)
+
+![Иллюстрация к проекту](https://github.com/PetrovAlexey/ColorSegmentation/blob/main/RgbCube/screenshots/screenshot.png?raw=true)
 
 ## Функционал
 
